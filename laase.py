@@ -22,33 +22,68 @@ class Posting:
 search_dir = ""
 doc_lex = []
 doc_length = []
+doc_score = []
 avg_doc_length = 1
 doc_index = 0
 index = dict()
 term_lex = dict()
 term_index = 0
-postings = []
 b = 0.2
 
-def pivoted_normalization(term, query_term_count, doc_freq):
-    global(index)
-    global(b)
-    global(avg_doc_length)
-    global(doc_index)
-    global(doc_length)
-    score = 0
+def pivoted_normalization(term, query_term_count):
+    global index
+    global b
+    global avg_doc_length
+    global doc_index
+    global doc_length
+    global doc_score
+    doc_freq = 0
     postings = index[term]
+    for posting in postings:
+        #calculate document frequency
+        doc_freq = doc_freq + 1
     for posting in postings:
         first_term = (1+math.log(1+math.log(posting.term_frequency))) / ((1-b)+b * doc_length[posting.doc_id] / avg_doc_length)
         second_term = query_term_count * math.log((doc_index+1)/doc_freq)
-        score += first_term * second_term
+        doc_score[posting.doc_id] += first_term * second_term
 
 #for pivoted normalization, need doc length and avg doc length
 # also need num of docs in collection (doc_index after indexing) and document frequency
 # so we need to check document frequency and query frequency before running this function on each term in the query
 
 def rank(query):
+    global doc_index
+    #initialize scores to zero
+    for i in range(doc_index):
+        doc_score[i] = 0
     query_terms = query.split(" ")
+    query_one = []
+    for qt in query_terms:
+        if qt not in [item[0] for item in query_one]:
+            query_one.append((qt, 1))
+        else:
+            for (match, freq) in query_one:
+                if (match == qt):
+                    freq = freq + 1
+    for (qt, qt_freq) in query_one:
+        pivoted_normalization(qt, qt_freq)
+    return
+
+def retrieve(ret_count):
+    high_score = 0
+    top_index = 0
+    for i in range(ret_count):
+        for j in range(doc_index):
+            if doc_score[j] > high_score:
+                high_score = doc_score[j]
+                top_index = j
+        print(str(i+1)+".) "+doc_lex[top_index]+" with score "+str(high_score))
+        #set retrieved article's score to 0 to avoid reprinting it
+        doc_score[top_index] = 0
+        top_index = 0
+        high_score = 0
+    return
+
     #need to count how many times each term occurs and call pivoted_normalization only once for each
     #then send as an argument (query_term_count)
     #need to calculate doc_freq here for each query term
@@ -73,6 +108,7 @@ while user_choice != "quit":
                 sub_index = dict()
                 doc_lex.append(filename)
                 doc_length.append(0)
+                doc_score.append(0)
                 for page in pdf:
                     #iterate over pages from pdf
                     #print(page)
@@ -108,8 +144,10 @@ while user_choice != "quit":
             for doc_posting in posting:
                 print("\t"+ doc_lex[doc_posting.doc_id]+", "+ str(doc_posting.term_frequency))
     elif user_choice == "5":
-        useless = 1
         # search query
+        query = input("Please enter a query: ")
+        rank(query)
+        retrieve(5)
     print_options()
     user_choice = input()
 print("Exiting . . .")
