@@ -12,6 +12,7 @@ def print_options():
     print("3. Build index")
     print("4. Print index")
     print("5. Enter query")
+    print("(or type 'quit' to exit)")
 
 class Posting:
     def __init__(self, doc_id, term_frequency):
@@ -20,6 +21,9 @@ class Posting:
 
 
 search_dir = ""
+categories = []
+categories_index = 0
+window_size = 3 #on each side
 doc_lex = []
 doc_length = []
 doc_score = []
@@ -70,6 +74,8 @@ def rank(query):
     return
 
 def retrieve(ret_count):
+    global index
+    global categories
     high_score = 0
     top_index = 0
     for i in range(ret_count):
@@ -78,6 +84,21 @@ def retrieve(ret_count):
                 high_score = doc_score[j]
                 top_index = j
         print(str(i+1)+".) "+doc_lex[top_index]+" with score "+str(high_score))
+        for category in categories:
+            cat_score = 0
+            best_cat_word = ""
+            for cat_word in category:
+                if cat_word != category[0] and cat_word in index: #category 0 is the category name
+                    postings = index[cat_word]
+                    for posting in postings:
+                        if posting.doc_id == top_index:
+                            if posting.term_frequency > cat_score:
+                                cat_score = posting.term_frequency
+                                best_cat_word = cat_word
+            if cat_score != 0:
+                print("\t" + category[0] + ": " + best_cat_word + " (" + str(cat_score) + ")")
+            else:
+                print("\t" + category[0] + ": not found")
         #set retrieved article's score to 0 to avoid reprinting it
         doc_score[top_index] = 0
         top_index = 0
@@ -96,8 +117,18 @@ while user_choice != "quit":
         # choose directory
         search_dir = input("Enter directory: ")
     elif user_choice == "2":
-        useless = 0
         # add search category
+        cat = input("Enter a category name:")
+        #categories is list of lists
+        #each list is category name followed by associated terms
+        categories.append([])
+        categories[categories_index].append(cat)
+        cat_terms = input("Enter associated terms (comma separated, no spaces):")
+        cat_terms = cat_terms.split(',')
+        for cat_term in cat_terms:
+            categories[categories_index].append(cat_term)
+        categories_index += 1
+        print("Categories:", categories)
     elif user_choice == "3":
         # build index
         print("Building index . . .")
@@ -109,6 +140,9 @@ while user_choice != "quit":
                 doc_lex.append(filename)
                 doc_length.append(0)
                 doc_score.append(0)
+                # need to initialize list of tuples for this doc's cat terms
+                # need to append tuples for each cat term that is in the doc
+                # need to update it (value will be tf of the term)
                 for page in pdf:
                     #iterate over pages from pdf
                     #print(page)
